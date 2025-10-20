@@ -46,17 +46,17 @@ jobs:
     - name: Test Docker Compose
       run: |
         echo "🚀 Testing Docker Compose setup..."
-        docker-compose down || true
-        docker-compose up -d --build
+        docker compose down || true
+        docker compose up -d --build
         
         echo "⏳ Waiting for services to start..."
         sleep 60
         
         echo "📊 Checking services status..."
-        docker-compose ps
+        docker compose ps
         
         echo "🏥 Testing application health..."
-        curl -f http://localhost:8089/adoption/actuator/health || (echo "❌ Health check failed" && docker-compose logs adoption-spring-app && exit 1)
+        curl -f http://localhost:8089/adoption/actuator/health || (echo "❌ Health check failed" && docker compose logs adoption-spring-app && exit 1)
         
     - name: Success message
       if: success()
@@ -68,3 +68,7 @@ jobs:
         echo "   - Prometheus : http://localhost:9090"
         echo "   - MySQL : localhost:3306"
         echo "✅ Prêt pour la démonstration!"
+        
+    - name: Cleanup
+      if: always()
+      run: docker compose down || true
