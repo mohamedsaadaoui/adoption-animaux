@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  mysql-db:
+    image: mysql:8.0
+    container_name: adoption-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: adoptionProject
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - adoption-network
+
+  adoption-app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: adoption-spring-app
+    ports:
+      - "8089:8089"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/adoptionProject?createDatabaseIfNotExist=true&useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 1234
+      SERVER_PORT: 8089
+      SERVER_SERVLET_CONTEXT_PATH: /adoption
+      # Configuration Actuator CORRECTEMENT PLACÉE
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus,info
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: always
+      MANAGEMENT_METRICS_EXPORT_PROMETHEUS_ENABLED: true
+    depends_on:
+      - mysql-db
+    networks:
+      - adoption-network
+
+  prometheus:
+    image: prom/prometheus
+    container_name: adoption-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - adoption-network
+
+  grafana:
+    image: grafana/grafana
+    container_name: adoption-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - adoption-network
+
+  # Exporteur MySQL (OPTIONNEL - vous pouvez le supprimer si problème)
+# Exporteur MySQL (COMMENTÉ pour l'instant)
+# mysql-exporter:
+#   image: prom/mysqld-exporter
+#   container_name: mysql-exporter
+#   environment:
+#     - DATA_SOURCE_NAME=root:1234@(mysql-db:3306)/adoptionProject
+#   ports:
+#     - "9104:9104"
+#   depends_on:
+#     - mysql-db
+#   networks:
+#     - adoption-network
+
+volumes:
+  mysql_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  adoption-network:
+    driver: bridge

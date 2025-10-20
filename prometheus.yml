@@ -1,0 +1,26 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus lui-même
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Application Spring Boot
+  - job_name: 'adoption-spring-app'
+    metrics_path: '/adoption/actuator/prometheus'
+    static_configs:
+      - targets: ['adoption-app:8089']
+    scrape_interval: 10s
+
+  # MySQL Exporter (supprimé pour l'instant)
+  # - job_name: 'mysql-exporter'
+  #   static_configs:
+  #     - targets: ['mysql-exporter:9104']
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []

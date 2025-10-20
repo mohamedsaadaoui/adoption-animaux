@@ -1,0 +1,2 @@
+error during connect: Delete "http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.51/containers/adoption-mysql": open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.
+error during connect: Delete "http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.51/containers/adoption-spring-app": open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.

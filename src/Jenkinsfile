@@ -1,0 +1,127 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'M3'
+        jdk 'JDK17'
+    }
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('docker-hub-credentials')
+        SONAR_SCANNER_HOME = tool 'SonarScanner'
+    }
+
+    stages {
+        stage('Checkout Git') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/votre-username/adoption-project.git'
+            }
+        }
+
+        stage('Compilation') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+
+        stage('Tests Unitaires') {
+            steps {
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    junit 'target/surefire-reports/*.xml'
+                    archiveArtifacts 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Analyse SonarQube') {
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    sh 'mvn sonar:sonar \
+                        -Dsonar.projectKey=adoption-project \
+                        -Dsonar.projectName=Adoption-Project'
+                }
+            }
+        }
+
+        stage('Build Application') {
+            steps {
+                sh 'mvn clean package -DskipTests'
+            }
+            post {
+                success {
+                    archiveArtifacts 'target/*.jar'
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    docker.build("votredockerhub/adoption-app:${env.BUILD_ID}")
+                }
+            }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                script {
+                    docker.withRegistry('', 'docker-hub-credentials') {
+                        docker.image("votredockerhub/adoption-app:${env.BUILD_ID}").push()
+                    }
+                }
+            }
+        }
+
+        stage('Deploy with Docker Compose') {
+            steps {
+                sh '''
+                    docker-compose down
+                    docker-compose up -d
+                    sleep 30
+                '''
+            }
+        }
+
+        stage('API Tests') {
+            steps {
+                script {
+                    // Tests API basiques avec curl
+                    sh '''
+                        echo "Testing API endpoints..."
+                        curl -X POST http://localhost:8089/addAdoptant \
+                             -H "Content-Type: application/json" \
+                             -d '{"nom":"TestUser","adresse":"123 Test","telephone":"0123456789"}' \
+                             -w "\\nHTTP Status: %{http_code}\\n"
+
+                        curl -X GET http://localhost:8089/byAdoptant/TestUser \
+                             -w "\\nHTTP Status: %{http_code}\\n"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            emailext (
+                subject: "SUCCÈS: Build ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                body: "Le pipeline CI/CD a réussi!",
+                to: "email@example.com"
+            )
+        }
+        failure {
+            emailext (
+                subject: "ÉCHEC: Build ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                body: "Le pipeline CI/CD a échoué.",
+                to: "email@example.com"
+            )
+        }
+    }
+}
