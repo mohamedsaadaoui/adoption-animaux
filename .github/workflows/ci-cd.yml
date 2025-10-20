@@ -14,18 +14,32 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Validate project structure
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: 'maven'
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2-
+        
+    - name: Build with Maven
+      run: mvn clean package -DskipTests
+      
+    - name: Verify JAR file
       run: |
-        echo "📁 Project structure:"
-        ls -la
-        echo "🐳 Docker files:"
-        [ -f "Dockerfile" ] && echo "✅ Dockerfile exists" || echo "❌ Dockerfile missing"
-        [ -f "docker-compose.yml" ] && echo "✅ docker-compose.yml exists" || echo "❌ docker-compose.yml missing"
-        [ -f "prometheus.yml" ] && echo "✅ prometheus.yml exists" || echo "❌ prometheus.yml missing"
+        echo "📦 Checking built JAR..."
+        ls -la target/
+        [ -f "target/adoption-Project-0.0.1-SNAPSHOT.jar" ] && echo "✅ JAR file exists" || echo "❌ JAR file missing"
         
     - name: Build Docker image
       run: |
-        echo "🔨 Building Docker image..."
+        echo "🐳 Building Docker image..."
         docker build -t adoption-animaux:latest .
         echo "✅ Docker image built successfully"
         
@@ -36,20 +50,21 @@ jobs:
         docker-compose up -d --build
         
         echo "⏳ Waiting for services to start..."
-        sleep 45
+        sleep 60
         
         echo "📊 Checking services status..."
         docker-compose ps
         
         echo "🏥 Testing application health..."
-        timeout 10s bash -c 'until curl -f http://localhost:8089/adoption/actuator/health; do sleep 2; done' || echo "⚠️ Health check timeout"
+        curl -f http://localhost:8089/adoption/actuator/health || (echo "❌ Health check failed" && docker-compose logs adoption-spring-app && exit 1)
         
     - name: Success message
       if: success()
       run: |
-        echo "🎉 CI/CD Pipeline EXECUTED SUCCESSFULLY!"
-        echo "📊 Services are running:"
-        echo "   - App: http://localhost:8089/adoption"
-        echo "   - Grafana: http://localhost:3000" 
-        echo "   - Prometheus: http://localhost:9090"
-        echo "✅ Ready for demonstration!"
+        echo "🎉 CI/CD Pipeline EXECUTÉ AVEC SUCCÈS!"
+        echo "📊 Services en cours d'exécution :"
+        echo "   - Application : http://localhost:8089/adoption"
+        echo "   - Grafana : http://localhost:3000" 
+        echo "   - Prometheus : http://localhost:9090"
+        echo "   - MySQL : localhost:3306"
+        echo "✅ Prêt pour la démonstration!"
